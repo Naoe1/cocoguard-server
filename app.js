@@ -2,6 +2,7 @@ import express from "express";
 import bodyParser from "body-parser";
 import cookieParser from "cookie-parser";
 import cors from "cors";
+import authRoutes from "./routes/auth.js";
 
 const app = express();
 
@@ -13,6 +14,8 @@ app.use(cors({ credentials: true, origin: "http://localhost:5173" }));
 app.get("/", (req, res) => {
   res.send("CocoGuard API is running");
 });
+
+app.use("/api/auth", authRoutes);
 
 app.use((req, res, next) => {
   const error = new Error(`Not Found - ${req.originalUrl}`);

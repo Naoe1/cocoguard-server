@@ -2,16 +2,25 @@
   "name": "cocoguard-server",
   "version": "1.0.0",
   "main": "index.js",
+  "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "nodemon app.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@supabase/supabase-js": "^2.50.0",
     "body-parser": "^2.2.0",
     "cookie-parser": "^1.4.7",
-    "express": "^5.1.0"
+    "cors": "^2.8.5",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0",
+    "zod": "^3.25.64"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
   }
 }
