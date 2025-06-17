@@ -85,7 +85,7 @@ export const register = async (req, res, next) => {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "strict",
-        maxAge: 30 * 24 * 60 * 60 * 1000,
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
         path: "/api/auth/refresh",
       });
 
@@ -255,6 +255,121 @@ export const getCurrentUser = async (req, res, next) => {
     });
   } catch (error) {
     console.error("Get current user error:", error);
+    return next(new HttpError("Internal server error", 500));
+  }
+};
+
+export const forgotPassword = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+
+    const { data: userData, error: userErr } = await supabase
+      .from("user")
+      .select("email")
+      .eq("email", email)
+      .single();
+
+    if (!userData) return next(new HttpError("User not found", 404));
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email);
+
+    if (error) {
+      return next(new HttpError(error.message, error.status));
+    }
+
+    return res.status(200).json({
+      message:
+        "Password reset link has been successfully sent. It may take 5-10 minutes to arrive in your inbox.",
+    });
+  } catch (error) {
+    console.error("Reset password error:", error);
+    return next(new HttpError("Something went wrong!", 500));
+  }
+};
+
+export const updatePassword = async (req, res, next) => {
+  try {
+    const { password } = req.body;
+    const token = req.query.token;
+    const { data: userData, error: userErr } = await supabase.auth.verifyOtp({
+      token_hash: token,
+      type: "email",
+    });
+
+    const userId = userData?.user?.id;
+    if (userErr || !userId) return next(new HttpError("Invalid token", 400));
+
+    const { error: updateErr } = await supabase.auth.admin.updateUserById(
+      userId,
+      { password: password }
+    );
+
+    if (updateErr) {
+      return next(new HttpError(updateErr.message, updateErr.status));
+    }
+
+    return res.status(200).json({ message: "Password updated successfully" });
+  } catch (error) {
+    console.error("Update password error:", error);
+    return next(new HttpError("Internal server error", 500));
+  }
+};
+
+export const updateProfile = async (req, res, next) => {
+  try {
+    const {
+      firstName,
+      lastName,
+      street,
+      barangay,
+      city,
+      province,
+      region,
+      postal_code,
+    } = req.body;
+
+    const userId = res.locals.authData.sub;
+    const farmId = res.locals.farmId;
+
+    const { error: updateError } = await supabase
+      .from("user")
+      .update({
+        first_name: firstName,
+        last_name: lastName,
+      })
+      .eq("id", userId);
+
+    const { error: farmError } = await supabase
+      .from("farm")
+      .update({
+        street,
+        barangay,
+        city,
+        province,
+        region,
+        postal_code,
+      })
+      .eq("id", farmId);
+
+    if (updateError || farmError) {
+      return next(new HttpError(updateError.message, 400));
+    }
+
+    return res.status(200).json({
+      message: "Account updated successfully",
+      data: {
+        firstName,
+        lastName,
+        street,
+        barangay,
+        city,
+        province,
+        region,
+        postal_code,
+      },
+    });
+  } catch (error) {
+    console.error("Update account error:", error);
     return next(new HttpError("Internal server error", 500));
   }
 };
