@@ -3,6 +3,8 @@ import bodyParser from "body-parser";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import authRoutes from "./routes/auth.js";
+import coconutRoutes from "./routes/coconuts.js";
+import { authMiddleware } from "./middleware/authMiddleware.js";
 
 const app = express();
 
@@ -16,6 +18,9 @@ app.get("/", (req, res) => {
 });
 
 app.use("/api/auth", authRoutes);
+app.use(authMiddleware);
+
+app.use("/api/coconuts", coconutRoutes);
 
 app.use((req, res, next) => {
   const error = new Error(`Not Found - ${req.originalUrl}`);
