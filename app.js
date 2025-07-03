@@ -8,6 +8,7 @@ import inventoryRoutes from "./routes/inventory.js";
 import harvestRoutes from "./routes/harvests.js";
 import treatmentRoutes from "./routes/treatments.js";
 import nutrientRoutes from "./routes/nutrients.js";
+import staffRoutes from "./routes/staff.js";
 import { authMiddleware } from "./middleware/authMiddleware.js";
 
 const app = express();
@@ -29,6 +30,7 @@ app.use("/api/inventory", inventoryRoutes);
 app.use("/api/harvests", harvestRoutes);
 app.use("/api/treatments", treatmentRoutes);
 app.use("/api/nutrients", nutrientRoutes);
+app.use("/api/staff", staffRoutes);
 
 app.use((req, res, next) => {
   const error = new Error(`Not Found - ${req.originalUrl}`);
