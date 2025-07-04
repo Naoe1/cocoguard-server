@@ -34,11 +34,6 @@ yarn-error.log*
 *.sw?
 .DS_Store
 
-# Temporary files
-tmp/
-temp/
-.cache/
-
 # Debug
 .nyc_output/
 
