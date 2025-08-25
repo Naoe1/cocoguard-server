@@ -335,3 +335,27 @@ export const getCopraPriceHistory = async (req, res, next) => {
     return next(new HttpError("Internal server error", 500));
   }
 };
+
+export const getSaleHistory = async (req, res, next) => {
+  try {
+    const farmId = res.locals.farmId;
+
+    const { data, error } = await supabase
+      .from("sales")
+      .select(
+        `id,order_id,amount,paypal_fee,net_amount,
+        sale_items(*)
+      `
+      )
+      .eq("farm_id", Number(farmId));
+    if (error) {
+      console.error("Get sale history error:", error);
+      return next(new HttpError(error.message, 400));
+    }
+
+    return res.status(200).json({ sales: data });
+  } catch (error) {
+    console.error("Get sale history error:", error);
+    return next(new HttpError("Internal server error", 500));
+  }
+};

@@ -118,6 +118,7 @@ export const capturePaypalOrder = async (req, res, next) => {
           unit_price: Number(item.unit_amount.value),
           quantity: Number(item.quantity),
           subtotal: Number(item.unit_amount.value) * Number(item.quantity),
+          name: item.name,
         }));
         console.log("Sale items:", saleItems);
         const { error: itemsError } = await supabase

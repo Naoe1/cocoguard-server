@@ -7,6 +7,7 @@ import {
   deleteProduct,
   getSalesStats,
   getCopraPriceHistory,
+  getSaleHistory,
 } from "../controllers/productsController.js";
 import { validateRequest } from "../middleware/validateRequest.js";
 import {
@@ -18,6 +19,7 @@ import { restrictToAdmin } from "../middleware/authMiddleware.js";
 const router = express.Router();
 router.get("/", getAllProducts);
 router.get("/stats", getSalesStats);
+router.get("/sale-history", getSaleHistory);
 router.get("/:productId", getProductById);
 router.get("/copra/history", restrictToAdmin, getCopraPriceHistory);
 router.post(
