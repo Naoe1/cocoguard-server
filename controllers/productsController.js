@@ -31,7 +31,7 @@ export const getProductById = async (req, res, next) => {
     const { data, error } = await supabase
       .from("products")
       .select(
-        "id,description,price,amount_to_sell,inventory(id, name, stock_qty)"
+        "id,description,price,image,amount_to_sell,inventory(id, name, stock_qty)"
       )
       .eq("id", productId)
       .eq("farm_id", farmId)
