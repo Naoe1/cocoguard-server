@@ -14,6 +14,7 @@ export const register = async (req, res, next) => {
       region,
       street,
       city,
+      paypal_email,
     } = req.body;
 
     const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -49,6 +50,7 @@ export const register = async (req, res, next) => {
         region,
         postal_code,
         city,
+        paypal_email,
       })
       .select("*");
 

@@ -5,6 +5,19 @@ import { createOrder, captureOrder, getOrderDetails } from "../utils/paypal.js";
 export const getAllFarmProducts = async (req, res, next) => {
   try {
     const { farmId } = req.params;
+
+    if (isNaN(Number(farmId))) {
+      return next(new HttpError("Farm not found", 404));
+    }
+    const { data: farmData, error: farmError } = await supabase
+      .from("farm")
+      .select("id")
+      .eq("id", farmId);
+
+    console.log(farmData);
+
+    if (!farmData.length) return next(new HttpError("Farm not found", 404));
+
     const { data, error } = await supabase
       .from("products")
       .select(
@@ -15,8 +28,8 @@ export const getAllFarmProducts = async (req, res, next) => {
 
     console.log(data);
 
-    if (error) {
-      console.error("Get products join error:", error);
+    if (error || farmError) {
+      console.error("Fetch error:", error);
       return next(new HttpError(error.message, 400));
     }
 
@@ -30,7 +43,6 @@ export const getAllFarmProducts = async (req, res, next) => {
 export const getProductById = async (req, res, next) => {
   try {
     const { productId, farmId } = req.params;
-    console.log(req.params);
 
     const { data, error } = await supabase
       .from("products")
@@ -63,13 +75,29 @@ export const getProductById = async (req, res, next) => {
 export const createPaypalOrder = async (req, res, next) => {
   try {
     const { cart } = req.body;
+    const { farmId } = req.params;
+
+    const { data, error } = await supabase
+      .from("farm")
+      .select("id,paypal_email")
+      .eq("id", farmId)
+      .single();
+
+    console.log(data);
+
+    if (error) return next(new HttpError("Retrieve farm details failed", 500));
+
     if (!cart || !Array.isArray(cart) || cart.length === 0) {
       return res
         .status(400)
         .json({ message: "Invalid or empty cart data provided." });
     }
+    const { paypal_email } = data;
 
-    const { jsonResponse, httpStatusCode } = await createOrder(cart);
+    const { jsonResponse, httpStatusCode } = await createOrder(
+      cart,
+      paypal_email
+    );
     res.status(httpStatusCode).json(jsonResponse);
   } catch (error) {
     console.error("Failed to create order:", error);

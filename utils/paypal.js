@@ -28,7 +28,7 @@ const generateAccessToken = async () => {
   }
 };
 
-export const createOrder = async (cart) => {
+export const createOrder = async (cart, farmEmail) => {
   console.log(
     "Shopping cart information passed from the frontend createOrder() callback:",
     cart
@@ -80,6 +80,9 @@ export const createOrder = async (cart) => {
             },
             // Can add tax_total, shipping, discount etc. here
           },
+        },
+        payee: {
+          email_address: farmEmail,
         },
         items: cart.map((item) => {
           const details = detailMap[item.sku];
