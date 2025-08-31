@@ -62,6 +62,8 @@ app.use((err, req, res, next) => {
   res.status(err.statusCode || err.code || 500).json(response);
 });
 
-app.listen(3000, () => {
-  console.log("Server is running on http://localhost:3000");
+const port = process.env.PORT || 3000;
+
+app.listen(port, () => {
+  console.log(`Server is running on http://localhost:${port}`);
 });
