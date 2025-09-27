@@ -4,8 +4,9 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "nodemon app.js"
+    "test": "vitest",
+    "start": "nodemon app.js",
+    "test:ui": "vitest --ui"
   },
   "keywords": [],
   "author": "",
@@ -23,6 +24,9 @@
     "zod": "^3.25.64"
   },
   "devDependencies": {
-    "nodemon": "^3.1.10"
+    "@vitest/ui": "^3.2.4",
+    "nodemon": "^3.1.10",
+    "supertest": "^7.1.4",
+    "vitest": "^3.2.4"
   }
 }

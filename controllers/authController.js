@@ -86,7 +86,7 @@ export const register = async (req, res, next) => {
       res.cookie("refresh_token", authData.session.refresh_token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
         maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
         path: "/api/auth/refresh",
       });
@@ -141,7 +141,7 @@ export const login = async (req, res, next) => {
     res.cookie("refresh_token", data.session.refresh_token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
       path: "/api/auth/refresh",
     });
