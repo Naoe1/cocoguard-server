@@ -20,7 +20,12 @@ const app = express();
 app.use(bodyParser.json());
 app.use(cookieParser());
 
-app.use(cors({ credentials: true, origin: "http://localhost:5173" }));
+app.use(
+  cors({
+    credentials: true,
+    origin: process.env.CORS_ORIGIN || "http://localhost:5173",
+  })
+);
 
 app.get("/", (req, res) => {
   res.send("CocoGuard API is running");
@@ -67,3 +72,5 @@ const port = process.env.PORT || 3000;
 app.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);
 });
+
+export default app;
