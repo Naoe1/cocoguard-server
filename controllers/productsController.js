@@ -1,5 +1,14 @@
 import supabase from "../supabase.js";
 import HttpError from "../utils/httpError.js";
+import { recordAuditEvent, computeDiff } from "../utils/auditLogs.js";
+
+const productFields = [
+  "inventory_id",
+  "description",
+  "price",
+  "amount_to_sell",
+  "image",
+];
 
 export const getAllProducts = async (req, res, next) => {
   try {
@@ -112,6 +121,17 @@ export const createProduct = async (req, res, next) => {
       return next(new HttpError(error.message, 400));
     }
 
+    recordAuditEvent({
+      actorId: res.locals.authData?.sub,
+      action: "create",
+      resourceType: "product",
+      resourceId: data?.id,
+      previous: null,
+      changes: computeDiff(null, data, productFields),
+      next: data,
+      farmId,
+    });
+
     return res.status(201).json({
       message: `Product listing for '${data.inventory.name}' created successfully`,
       product: data,
@@ -130,7 +150,7 @@ export const updateProduct = async (req, res, next) => {
 
     const { data: currentProduct, error: findError } = await supabase
       .from("products")
-      .select("id, amount_to_sell, inventory_id")
+      .select("id, description, price, image, amount_to_sell, inventory_id")
       .eq("id", productId)
       .eq("farm_id", farmId)
       .single();
@@ -172,6 +192,22 @@ export const updateProduct = async (req, res, next) => {
       return next(new HttpError(error.message, 400));
     }
 
+    const prev = currentProduct;
+    const nextState = {
+      ...prev,
+      ...updatePayload,
+    };
+    recordAuditEvent({
+      actorId: res.locals.authData?.sub,
+      action: "update",
+      resourceType: "product",
+      resourceId: productId,
+      previous: prev,
+      changes: computeDiff(prev, nextState, productFields),
+      next: nextState,
+      farmId,
+    });
+
     return res.status(200).json({
       message: `Product listing for '${data.inventory.name}' updated successfully`,
       product: data,
@@ -190,7 +226,9 @@ export const deleteProduct = async (req, res, next) => {
 
     const { data: existingProduct, error: findError } = await supabase
       .from("products")
-      .select("id, inventory ( name )")
+      .select(
+        "id, description, price, image, amount_to_sell, inventory ( name ), inventory_id"
+      )
       .eq("id", productId)
       .eq("farm_id", farmId)
       .single();
@@ -208,6 +246,17 @@ export const deleteProduct = async (req, res, next) => {
       console.error("Delete product error:", error);
       return next(new HttpError(error.message, 400));
     }
+
+    recordAuditEvent({
+      actorId: res.locals.authData?.sub,
+      action: "delete",
+      resourceType: "product",
+      resourceId: productId,
+      previous: existingProduct,
+      changes: { deleted: { from: false, to: true } },
+      next: null,
+      farmId,
+    });
 
     return res.status(200).json({
       message: `Product listing for '${existingProduct.inventory.name}' deleted successfully`,

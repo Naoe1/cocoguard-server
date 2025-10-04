@@ -1,5 +1,17 @@
 import supabase from "../supabase.js";
 import HttpError from "../utils/httpError.js";
+import { recordAuditEvent, computeDiff } from "../utils/auditLogs.js";
+
+const inventoryFields = [
+  "name",
+  "category",
+  "stock_qty",
+  "amount_per_unit",
+  "unit",
+  "low_stock_alert",
+  "stock_price",
+  "total_available",
+];
 
 export const getInventory = async (req, res, next) => {
   try {
@@ -107,6 +119,17 @@ export const createInventoryItem = async (req, res, next) => {
       return next(new HttpError(error.message, 400));
     }
 
+    recordAuditEvent({
+      actorId: res.locals.authData?.sub,
+      action: "create",
+      resourceType: "inventory",
+      resourceId: data.id,
+      previous: null,
+      changes: computeDiff(null, data, inventoryFields),
+      next: data,
+      farmId,
+    });
+
     return res.status(201).json({
       message: "Inventory item created successfully",
       inventoryItem: data,
@@ -191,6 +214,30 @@ export const updateInventoryItem = async (req, res, next) => {
       return next(new HttpError(error.message, 400));
     }
 
+    const prev = existingItem[0];
+    const nextState = {
+      ...prev,
+      name,
+      category,
+      stock_qty: stockQty,
+      amount_per_unit: amountPerUnit,
+      unit,
+      low_stock_alert: lowStockAlert,
+      stock_price: stockPrice,
+      total_available: totalAvailable || stockQty * amountPerUnit,
+    };
+
+    recordAuditEvent({
+      actorId: res.locals.authData?.sub,
+      action: "update",
+      resourceType: "inventory",
+      resourceId: inventoryId,
+      previous: prev,
+      changes: computeDiff(prev, nextState, inventoryFields),
+      next: nextState,
+      farmId,
+    });
+
     return res.status(200).json({
       message: "Inventory item updated successfully",
     });
@@ -228,6 +275,17 @@ export const deleteInventoryItem = async (req, res, next) => {
     if (error) {
       return next(new HttpError(error.message, 400));
     }
+
+    recordAuditEvent({
+      actorId: res.locals.authData?.sub,
+      action: "delete",
+      resourceType: "inventory",
+      resourceId: inventoryId,
+      previous: existingItem[0],
+      changes: { deleted: { from: false, to: true } },
+      next: null,
+      farmId,
+    });
 
     return res.status(200).json({
       message: "Inventory item deleted successfully",
@@ -281,6 +339,7 @@ export const addCoconutToInventory = async (req, res, next) => {
       return next(new HttpError(error.message, 400));
     }
 
+    const prevInv = { ...data };
     const { error: updateError } = await supabase
       .from("inventory")
       .update({
@@ -293,6 +352,21 @@ export const addCoconutToInventory = async (req, res, next) => {
     if (updateError) {
       return next(new HttpError(updateError.message, 400));
     }
+
+    const nextInv = {
+      ...prevInv,
+      total_available: prevInv.total_available + quantity,
+    };
+    recordAuditEvent({
+      actorId: res.locals.authData?.sub,
+      action: "inventory_adjust",
+      resourceType: "inventory",
+      resourceId: data.id,
+      previous: prevInv,
+      changes: computeDiff(prevInv, nextInv, ["total_available"]),
+      next: nextInv,
+      farmId,
+    });
 
     return res.status(201).json({
       message: "Coconut added to inventory successfully",

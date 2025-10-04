@@ -1,5 +1,16 @@
 import supabase from "../supabase.js";
 import HttpError from "../utils/httpError.js";
+import { recordAuditEvent, computeDiff } from "../utils/auditLogs.js";
+
+const treatmentFields = [
+  "date_applied",
+  "type",
+  "product",
+  "end_date",
+  "applied_to",
+  "amount",
+  "unit",
+];
 
 export const getAllTreatments = async (req, res, next) => {
   try {
@@ -110,6 +121,7 @@ export const createTreatment = async (req, res, next) => {
           },
         });
       }
+      const prevInv = { ...inventoryItem };
       const { error: inventoryErrorUpdate } = await supabase
         .from("inventory")
         .update({
@@ -119,6 +131,21 @@ export const createTreatment = async (req, res, next) => {
       if (inventoryErrorUpdate) {
         return next(new HttpError(inventoryErrorUpdate.message, 400));
       }
+
+      const nextInv = {
+        ...prevInv,
+        total_available: prevInv.total_available - amount,
+      };
+      recordAuditEvent({
+        actorId: res.locals.authData?.sub,
+        action: "inventory_adjust",
+        resourceType: "inventory",
+        resourceId: prevInv.id,
+        previous: prevInv,
+        changes: computeDiff(prevInv, nextInv, ["total_available"]),
+        next: nextInv,
+        farmId,
+      });
     }
 
     const { data, error } = await supabase
@@ -137,6 +164,18 @@ export const createTreatment = async (req, res, next) => {
     if (error) {
       return next(new HttpError(error.message, 400));
     }
+
+    const created = Array.isArray(data) ? data[0] : data;
+    recordAuditEvent({
+      actorId: res.locals.authData?.sub,
+      action: "create",
+      resourceType: "treatment",
+      resourceId: created?.id,
+      previous: null,
+      changes: computeDiff(null, created, treatmentFields),
+      next: created,
+      farmId,
+    });
 
     return res.status(201).json({
       message: "treatment created successfully",
@@ -192,6 +231,27 @@ export const updateTreatment = async (req, res, next) => {
       return next(new HttpError(error.message, 400));
     }
 
+    const prev = existingTreatment;
+    const nextState = {
+      ...prev,
+      date_applied: dateApplied,
+      type,
+      product,
+      end_date: endDate,
+      amount,
+      unit,
+    };
+    recordAuditEvent({
+      actorId: res.locals.authData?.sub,
+      action: "update",
+      resourceType: "treatment",
+      resourceId: treatmentId,
+      previous: prev,
+      changes: computeDiff(prev, nextState, treatmentFields),
+      next: nextState,
+      farmId,
+    });
+
     return res.status(200).json({
       message: "Treatment updated successfully",
     });
@@ -227,6 +287,16 @@ export const deleteTreatment = async (req, res, next) => {
     if (error) {
       return next(new HttpError(error.message, 400));
     }
+    recordAuditEvent({
+      actorId: res.locals.authData?.sub,
+      action: "delete",
+      resourceType: "treatment",
+      resourceId: treatmentId,
+      previous: existingTreatment,
+      changes: { deleted: { from: false, to: true } },
+      next: null,
+      farmId,
+    });
     return res.status(200).json({
       message: "Treatment deleted successfully",
     });

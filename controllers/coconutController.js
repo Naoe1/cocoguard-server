@@ -2,10 +2,18 @@ import supabase from "../supabase.js";
 import HttpError from "../utils/httpError.js";
 import axios from "axios";
 import fs from "fs";
+import { recordAuditEvent, computeDiff } from "../utils/auditLogs.js";
+
+const coconutFields = [
+  "tree_code",
+  "trunk_diameter",
+  "planting_date",
+  "height",
+  "status",
+];
 
 export const getAllCoconuts = async (req, res, next) => {
   const farmId = res.locals.farmId;
-  console.log("Farm ID:", farmId);
   try {
     const { data, error } = await supabase
       .from("tree")
@@ -106,11 +114,20 @@ export const createCoconut = async (req, res, next) => {
       .select()
       .single();
 
-    console.log(error);
-
     if (error) {
       return next(new HttpError(error.message, 400));
     }
+
+    recordAuditEvent({
+      actorId: res.locals.authData?.sub,
+      action: "create",
+      resourceType: "coconut",
+      resourceId: data.id,
+      previous: null,
+      changes: computeDiff(null, data, coconutFields),
+      next: data,
+      farmId,
+    });
 
     return res.status(201).json({
       message: "Coconut created successfully",
@@ -180,6 +197,26 @@ export const updateCoconut = async (req, res, next) => {
       return next(new HttpError(error.message, 400));
     }
 
+    const nextState = {
+      ...coconut,
+      tree_code: treeCode,
+      trunk_diameter: trunkDiameter,
+      planting_date: plantingDate,
+      height,
+      status,
+    };
+
+    recordAuditEvent({
+      actorId: res.locals.authData?.sub,
+      action: "update",
+      resourceType: "coconut",
+      resourceId: coconutId,
+      previous: coconut,
+      changes: computeDiff(coconut, nextState, coconutFields),
+      next: nextState,
+      farmId,
+    });
+
     return res.status(200).json({
       message: "Coconut updated successfully",
     });
@@ -213,6 +250,17 @@ export const deleteCoconut = async (req, res, next) => {
     if (error) {
       return next(new HttpError(error.message, 400));
     }
+
+    recordAuditEvent({
+      actorId: userId,
+      action: "delete",
+      resourceType: "coconut",
+      resourceId: coconutId,
+      previous: coconut,
+      changes: { deleted: { from: false, to: true } },
+      next: null,
+      farmId,
+    });
 
     return res.status(200).json({
       message: "Coconut deleted successfully",

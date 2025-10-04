@@ -1,5 +1,15 @@
 import supabase from "../supabase.js";
 import HttpError from "../utils/httpError.js";
+import { recordAuditEvent, computeDiff } from "../utils/auditLogs.js";
+
+const harvestFields = [
+  "tree_id",
+  "harvest_date",
+  "coconut_count",
+  "total_weight",
+  "estimated_value",
+  "added_to_inventory",
+];
 
 export const getAllHarvests = async (req, res, next) => {
   try {
@@ -104,6 +114,18 @@ export const createHarvest = async (req, res, next) => {
       return next(new HttpError(error.message, 400));
     }
 
+    const created = Array.isArray(data) ? data[0] : data;
+    recordAuditEvent({
+      actorId: res.locals.authData?.sub,
+      action: "create",
+      resourceType: "harvest",
+      resourceId: created?.id,
+      previous: null,
+      changes: computeDiff(null, created, harvestFields),
+      next: created,
+      farmId,
+    });
+
     return res.status(201).json({
       message: "Harvest created successfully",
       harvest: data,
@@ -134,7 +156,7 @@ export const updateHarvest = async (req, res, next) => {
     if (!existingHarvest) {
       return next(new HttpError("Harvest not found", 404));
     }
-    // Update the harvest
+
     const { error } = await supabase
       .from("harvest")
       .update({
@@ -148,6 +170,26 @@ export const updateHarvest = async (req, res, next) => {
     if (error) {
       return next(new HttpError(error.message, 400));
     }
+
+    const prev = existingHarvest;
+    const nextState = {
+      ...prev,
+      coconut_count: coconutCount,
+      total_weight: totalWeight,
+      estimated_value: estimatedValue,
+      harvest_date: harvestDate,
+    };
+
+    recordAuditEvent({
+      actorId: res.locals.authData?.sub,
+      action: "update",
+      resourceType: "harvest",
+      resourceId: harvestId,
+      previous: prev,
+      changes: computeDiff(prev, nextState, harvestFields),
+      next: nextState,
+      farmId,
+    });
 
     return res.status(200).json({
       message: "Coconut updated successfully",
@@ -184,6 +226,18 @@ export const deleteHarvest = async (req, res, next) => {
     if (error) {
       return next(new HttpError(error.message, 400));
     }
+
+    // Audit: delete (best-effort)
+    recordAuditEvent({
+      actorId: res.locals.authData?.sub,
+      action: "delete",
+      resourceType: "harvest",
+      resourceId: harvestId,
+      previous: existingHarvest,
+      changes: { deleted: { from: false, to: true } },
+      next: null,
+      farmId,
+    });
     return res.status(200).json({
       message: "Harvest deleted successfully",
     });
@@ -236,6 +290,20 @@ export const addToInventory = async (req, res, next) => {
         new HttpError(`Failed to add to inventory: ${error.message}`, 400)
       );
     }
+
+    // Audit: add to inventory flag flip (best-effort)
+    const prev = { ...harvest };
+    const nextState = { ...harvest, added_to_inventory: true };
+    recordAuditEvent({
+      actorId: res.locals.authData?.sub,
+      action: "add_to_inventory",
+      resourceType: "harvest",
+      resourceId: harvestId,
+      previous: prev,
+      changes: computeDiff(prev, nextState, ["added_to_inventory"]),
+      next: nextState,
+      farmId,
+    });
 
     return res.status(200).json({
       message: "Harvest successfully added to inventory",

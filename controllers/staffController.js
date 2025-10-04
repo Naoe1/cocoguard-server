@@ -1,5 +1,8 @@
 import supabase from "../supabase.js";
 import HttpError from "../utils/httpError.js";
+import { recordAuditEvent, computeDiff } from "../utils/auditLogs.js";
+
+const staffFields = ["first_name", "last_name", "role", "email", "farm_id"];
 
 export const createStaff = async (req, res, next) => {
   try {
@@ -30,6 +33,25 @@ export const createStaff = async (req, res, next) => {
       if (profileError) {
         next(new HttpError(profileError.message, 400));
       }
+
+      const createdProfile = {
+        id: authData.user.id,
+        first_name: firstName || "",
+        last_name: lastName || "",
+        role: "STAFF",
+        farm_id: adminFarmId,
+        email,
+      };
+      recordAuditEvent({
+        actorId: res.locals.authData?.sub,
+        action: "create",
+        resourceType: "staff",
+        resourceId: createdProfile.id,
+        previous: null,
+        changes: computeDiff(null, createdProfile, staffFields),
+        next: createdProfile,
+        farmId: adminFarmId,
+      });
     }
 
     return res.status(201).json({
@@ -122,6 +144,24 @@ export const updateStaff = async (req, res, next) => {
       .eq("id", staffId);
     if (updateError) return next(new HttpError(updateError.message, 400));
 
+    const prev = existingUserData;
+    const nextState = {
+      ...prev,
+      first_name: firstName || existingUserData.first_name,
+      last_name: lastName || existingUserData.last_name,
+      role: role || existingUserData.role,
+    };
+    recordAuditEvent({
+      actorId: res.locals.authData?.sub,
+      action: "update",
+      resourceType: "staff",
+      resourceId: staffId,
+      previous: prev,
+      changes: computeDiff(prev, nextState, staffFields),
+      next: nextState,
+      farmId: adminFarmId,
+    });
+
     return res.status(200).json({
       message: "Staff member updated successfully",
     });
@@ -165,6 +205,16 @@ export const deleteStaff = async (req, res, next) => {
     if (deleteProfileError) {
       return next(new HttpError("Could not delete staff member.", 500));
     }
+    recordAuditEvent({
+      actorId: res.locals.authData?.sub,
+      action: "delete",
+      resourceType: "staff",
+      resourceId: staffId,
+      previous: existingUserData,
+      changes: { deleted: { from: false, to: true } },
+      next: null,
+      farmId: adminFarmId,
+    });
     return res
       .status(200)
       .json({ message: "Staff member deleted successfully" });

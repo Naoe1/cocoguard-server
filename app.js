@@ -11,6 +11,7 @@ import staffRoutes from "./routes/staff.js";
 import statRoutes from "./routes/stats.js";
 import productRoutes from "./routes/products.js";
 import marketRoutes from "./routes/market.js";
+import auditRoutes from "./routes/audit.js";
 
 import { authMiddleware } from "./middleware/authMiddleware.js";
 import cors from "cors";
@@ -44,6 +45,7 @@ app.use("/api/nutrients", nutrientRoutes);
 app.use("/api/staff", staffRoutes);
 app.use("/api/stats", statRoutes);
 app.use("/api/products", productRoutes);
+app.use("/api/audit-events", auditRoutes);
 
 app.use((req, res, next) => {
   const error = new Error(`Not Found - ${req.originalUrl}`);
