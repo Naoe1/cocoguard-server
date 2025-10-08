@@ -18,7 +18,7 @@ export const getAuditEvents = async (req, res, next) => {
 
     let query = supabase
       .from("audit_events")
-      .select("*")
+      .select("*,actor_id(email, first_name, last_name)")
       .eq("farm_id", farmId)
       .order("created_at", { ascending: false });
 
