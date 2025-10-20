@@ -375,3 +375,48 @@ export const updateProfile = async (req, res, next) => {
     return next(new HttpError("Internal server error", 500));
   }
 };
+
+export const createStaff = async (req, res, next) => {
+  try {
+    const { password } = req.body;
+    const token = req.query.token;
+    const { data: userData, error: userErr } = await supabase.auth.verifyOtp({
+      token_hash: token,
+      type: "email",
+    });
+
+    const userId = userData?.user?.id;
+    if (userErr || !userId) return next(new HttpError("Invalid token", 400));
+
+    const { error: updateErr } = await supabase.auth.admin.updateUserById(
+      userId,
+      { password: password }
+    );
+
+    if (updateErr) {
+      return next(new HttpError(updateErr.message, updateErr.status));
+    }
+
+    console.log(userData.user.user_metadata);
+
+    if (userData.user) {
+      const { error: profileError } = await supabase.from("user").insert({
+        id: userData.user.id,
+        first_name: userData.user.user_metadata.firstName,
+        last_name: userData.user.user_metadata.lastName,
+        role: "STAFF",
+        farm_id: userData.user.user_metadata.farmId,
+        email: userData.user.email,
+      });
+
+      if (profileError) {
+        next(new HttpError(profileError.message, 400));
+      }
+    }
+
+    return res.status(200).json({ message: "User signed in successfully." });
+  } catch (error) {
+    console.error("Error:", error);
+    return next(new HttpError("Internal server error", 500));
+  }
+};

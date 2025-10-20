@@ -4,6 +4,56 @@ import { recordAuditEvent, computeDiff } from "../utils/auditLogs.js";
 
 const staffFields = ["first_name", "last_name", "role", "email", "farm_id"];
 
+export const inviteStaff = async (req, res, next) => {
+  try {
+    const adminFarmId = res.locals.farmId;
+    const role = res.locals.role;
+    if (role !== "ADMIN") return next(new HttpError("Unauthorized.", 403));
+
+    const { email, firstName, lastName } = req.body;
+    const { data: userData, error: userError } = await supabase
+      .from("user")
+      .select("*")
+      .eq("farm_id", adminFarmId)
+      .eq("email", email);
+
+    const user = userData[0];
+    if (userError) {
+      return next(new HttpError(userError.message, 400));
+    }
+    if (user) {
+      return res.status(400).json({
+        message: "Validation failed",
+        errors: [
+          {
+            field: "email",
+            message: "User already exists",
+          },
+        ],
+      });
+    }
+
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: process.env.SUPABASE_AUTH_REDIRECT_URL,
+        data: { firstName, lastName, farmId: adminFarmId },
+      },
+    });
+
+    if (error) {
+      return next(new HttpError(error.message, error.status));
+    }
+
+    return res.status(200).json({
+      message: "Invitation sent successfully",
+    });
+  } catch (error) {
+    console.error("Invite Staff Error:", error);
+    return next(new HttpError("Internal server error", 500));
+  }
+};
+
 export const createStaff = async (req, res, next) => {
   try {
     const adminFarmId = res.locals.farmId;
