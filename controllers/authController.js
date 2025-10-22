@@ -14,100 +14,126 @@ export const register = async (req, res, next) => {
       region,
       street,
       city,
-      paypal_email,
     } = req.body;
+
+    const { data: existingUser, error: existingUserError } = await supabase
+      .from("user")
+      .select("email")
+      .eq("email", email)
+      .maybeSingle();
+
+    if (existingUserError) {
+      return next(
+        new HttpError(existingUserError.message, existingUserError.status)
+      );
+    }
+
+    if (existingUser) {
+      return next(new HttpError("Email already registered", 409));
+    }
 
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        data: {
+          firstName,
+          lastName,
+          barangay,
+          postal_code,
+          province,
+          region,
+          street,
+          city,
+        },
+      },
     });
 
     if (authError) {
       next(new HttpError(authError.message, authError.status));
     }
 
-    if (authData.user) {
-      const { error: profileError } = await supabase.from("user").insert({
-        id: authData.user.id,
-        first_name: firstName || "",
-        last_name: lastName || "",
-        role: "ADMIN",
-        email: email,
-      });
+    // if (authData.user) {
+    //   const { error: profileError } = await supabase.from("user").insert({
+    //     id: authData.user.id,
+    //     first_name: firstName || "",
+    //     last_name: lastName || "",
+    //     role: "ADMIN",
+    //     email: email,
+    //   });
 
-      if (profileError) {
-        next(new HttpError(profileError.message, 400));
-      }
-    }
+    //   if (profileError) {
+    //     next(new HttpError(profileError.message, 400));
+    //   }
+    // }
 
-    const { data: farmData, error: farmError } = await supabase
-      .from("farm")
-      .insert({
-        owner: authData.user.id,
-        street,
-        barangay,
-        province,
-        region,
-        postal_code,
-        city,
-        paypal_email,
-      })
-      .select("*");
+    // const { data: farmData, error: farmError } = await supabase
+    //   .from("farm")
+    //   .insert({
+    //     owner: authData.user.id,
+    //     street,
+    //     barangay,
+    //     province,
+    //     region,
+    //     postal_code,
+    //     city,
+    //     paypal_email,
+    //   })
+    //   .select("*");
 
-    const { error: updateError } = await supabase
-      .from("user")
-      .update({ farm_id: farmData[0].id })
-      .eq("id", authData.user.id);
+    // const { error: updateError } = await supabase
+    //   .from("user")
+    //   .update({ farm_id: farmData[0].id })
+    //   .eq("id", authData.user.id);
 
-    if (updateError) next(new HttpError(updateError.message, 400));
+    // if (updateError) next(new HttpError(updateError.message, 400));
 
-    const { error: inventoryError } = await supabase.from("inventory").insert([
-      {
-        name: "Coconut",
-        unit: "kg",
-        stock_qty: 0,
-        category: "Product",
-        farm_id: farmData[0].id,
-      },
-      {
-        name: "Copra",
-        unit: "kg",
-        stock_qty: 0,
-        category: "Product",
-        farm_id: farmData[0].id,
-      },
-    ]);
+    // const { error: inventoryError } = await supabase.from("inventory").insert([
+    //   {
+    //     name: "Coconut",
+    //     unit: "kg",
+    //     stock_qty: 0,
+    //     category: "Product",
+    //     farm_id: farmData[0].id,
+    //   },
+    //   {
+    //     name: "Copra",
+    //     unit: "kg",
+    //     stock_qty: 0,
+    //     category: "Product",
+    //     farm_id: farmData[0].id,
+    //   },
+    // ]);
 
-    if (inventoryError || farmError) {
-      next(new HttpError("Error creating farm or inventory:", 400));
-    }
+    // if (inventoryError || farmError) {
+    //   next(new HttpError("Error creating farm or inventory:", 400));
+    // }
 
-    if (authData.session) {
-      res.cookie("refresh_token", authData.session.refresh_token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
-        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-        path: "/api/auth/refresh",
-      });
+    // if (authData.session) {
+    //   res.cookie("refresh_token", authData.session.refresh_token, {
+    //     httpOnly: true,
+    //     secure: process.env.NODE_ENV === "production",
+    //     sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+    //     maxAge: 30 * 24 * 60 * 60 * 1000,
+    //     path: "/api/auth/refresh",
+    //   });
 
-      return res.status(201).json({
-        message: "User created successfully",
-        user: {
-          firstName: firstName,
-          lastName: lastName,
-          email: email,
-          role: "ADMIN",
-          farmId: farmData[0].id,
-        },
-        access_token: authData.session.access_token,
-        expires_in: authData.session.expires_in,
-      });
-    }
+    //   return res.status(201).json({
+    //     message: "User created successfully",
+    //     user: {
+    //       firstName: firstName,
+    //       lastName: lastName,
+    //       email: email,
+    //       role: "ADMIN",
+    //       farmId: farmData[0].id,
+    //     },
+    //     access_token: authData.session.access_token,
+    //     expires_in: authData.session.expires_in,
+    //   });
+    // }
 
     return res.status(201).json({
-      message: "User created successfully",
-      user: authData.user,
+      message: "User created. Please confirm your email to continue.",
     });
   } catch (error) {
     console.error("Registration error:", error);
@@ -246,6 +272,7 @@ export const getCurrentUser = async (req, res, next) => {
       lastName: data.last_name,
       role: data.role,
       farmId,
+      paypal_email: data.farm_id.paypal_email,
       farmAddress: {
         street: data.farm_id.street,
         barangay: data.farm_id.barangay,
@@ -264,6 +291,8 @@ export const getCurrentUser = async (req, res, next) => {
 export const forgotPassword = async (req, res, next) => {
   try {
     const { email } = req.body;
+
+    console.log("forgot password for email: " + email);
 
     const { data: userData, error: userErr } = await supabase
       .from("user")
@@ -328,6 +357,7 @@ export const updateProfile = async (req, res, next) => {
       province,
       region,
       postal_code,
+      paypal_email,
     } = req.body;
 
     const userId = res.locals.authData.sub;
@@ -350,6 +380,7 @@ export const updateProfile = async (req, res, next) => {
         province,
         region,
         postal_code,
+        paypal_email,
       })
       .eq("id", farmId);
 
@@ -397,8 +428,6 @@ export const createStaff = async (req, res, next) => {
       return next(new HttpError(updateErr.message, updateErr.status));
     }
 
-    console.log(userData.user.user_metadata);
-
     if (userData.user) {
       const { error: profileError } = await supabase.from("user").insert({
         id: userData.user.id,
@@ -417,6 +446,84 @@ export const createStaff = async (req, res, next) => {
     return res.status(200).json({ message: "User signed in successfully." });
   } catch (error) {
     console.error("Error:", error);
+    return next(new HttpError("Internal server error", 500));
+  }
+};
+
+export const confirmEmail = async (req, res, next) => {
+  try {
+    const token = req.query.token;
+    const { email } = req.body;
+    const { data: userData, error: userErr } = await supabase.auth.verifyOtp({
+      token_hash: token,
+      type: "email",
+    });
+
+    if (userErr) {
+      console.log("Error verifying OTP:", userErr);
+      return next(new HttpError("Invalid token", 400));
+    }
+
+    if (userData.user) {
+      const { error: profileError } = await supabase.from("user").insert({
+        id: userData.user.id,
+        first_name: userData.user.user_metadata.firstName,
+        last_name: userData.user.user_metadata.lastName,
+        role: "ADMIN",
+        email: userData.user.email,
+      });
+
+      if (profileError) {
+        next(new HttpError(profileError.message, 400));
+      }
+    }
+
+    const { data: farmData, error: farmError } = await supabase
+      .from("farm")
+      .insert({
+        owner: userData.user.id,
+        street: userData.user.user_metadata.street,
+        barangay: userData.user.user_metadata.barangay,
+        province: userData.user.user_metadata.province,
+        region: userData.user.user_metadata.region,
+        postal_code: userData.user.user_metadata.postal_code,
+        city: userData.user.user_metadata.city,
+        paypal_email: email,
+      })
+      .select("*");
+
+    const { error: updateError } = await supabase
+      .from("user")
+      .update({ farm_id: farmData[0].id })
+      .eq("id", userData.user.id);
+
+    if (updateError) next(new HttpError(updateError.message, 400));
+
+    const { error: inventoryError } = await supabase.from("inventory").insert([
+      {
+        name: "Coconut",
+        unit: "kg",
+        stock_qty: 0,
+        category: "Product",
+        farm_id: farmData[0].id,
+      },
+      {
+        name: "Copra",
+        unit: "kg",
+        stock_qty: 0,
+        category: "Product",
+        farm_id: farmData[0].id,
+      },
+    ]);
+
+    if (inventoryError || farmError) {
+      next(new HttpError("Error creating farm or inventory:", 400));
+    }
+
+    return res.status(201).json({
+      message: "Email confirmed successfully",
+    });
+  } catch (error) {
     return next(new HttpError("Internal server error", 500));
   }
 };

@@ -33,15 +33,44 @@ export const inviteStaff = async (req, res, next) => {
       });
     }
 
+    const { data: newUser, error: adminErr } =
+      await supabase.auth.admin.createUser({
+        email,
+        email_confirm: true,
+      });
+
+    if (adminErr) {
+      if (adminErr.code === "email_exists" || adminErr.status === 422) {
+        return res.status(409).json({
+          message: "Email invite link already sent",
+        });
+      }
+      return next(new HttpError(adminErr.message, adminErr.status));
+    }
+
+    console.log("New User:", newUser);
+
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
         emailRedirectTo: process.env.SUPABASE_AUTH_REDIRECT_URL,
-        data: { firstName, lastName, farmId: adminFarmId },
       },
     });
 
-    if (error) {
+    const { error: updateError } = await supabase.auth.admin.updateUserById(
+      newUser.user.id,
+      {
+        user_metadata: {
+          firstName,
+          lastName,
+          farmId: adminFarmId,
+          email,
+          sub: newUser.user.id,
+        },
+      }
+    );
+
+    if (error || updateError) {
       return next(new HttpError(error.message, error.status));
     }
 
@@ -219,6 +248,7 @@ export const updateStaff = async (req, res, next) => {
     return next(new HttpError("Internal server error", 500));
   }
 };
+
 export const deleteStaff = async (req, res, next) => {
   try {
     const { staffId } = req.params;

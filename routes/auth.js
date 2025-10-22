@@ -9,6 +9,7 @@ import {
   updatePassword,
   updateProfile,
   createStaff,
+  confirmEmail,
 } from "../controllers/authController.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import { validateRequest } from "../middleware/validateRequest.js";
@@ -25,5 +26,6 @@ router.post("/logout", logout);
 router.get("/me", authMiddleware, getCurrentUser);
 router.patch("/update-profile", authMiddleware, updateProfile);
 router.post("/welcome", createStaff);
+router.post("/confirm", confirmEmail);
 
 export default router;
