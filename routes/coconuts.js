@@ -8,6 +8,7 @@ import {
   getCoconutStatsById,
   checkDisease,
   getCoconuStats,
+  updateCoconutLayout,
 } from "../controllers/coconutController.js";
 import { validateRequest } from "../middleware/validateRequest.js";
 import { createCoconutSchema } from "../schema/coconutSchema.js";
@@ -19,6 +20,7 @@ const router = express.Router();
 router.get("/", getAllCoconuts);
 router.get("/stats", getCoconuStats);
 router.post("/check-disease", upload.single("image"), checkDisease);
+router.post("/layout", updateCoconutLayout);
 router.get("/:coconutId", getCoconutById);
 router.get("/:coconutId/stats", getCoconutStatsById);
 router.post("/", validateRequest(createCoconutSchema), createCoconut);

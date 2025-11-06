@@ -485,3 +485,94 @@ export const checkDisease = async (req, res, next) => {
     return next(new HttpError("Internal server error", 500));
   }
 };
+
+export const updateCoconutLayout = async (req, res, next) => {
+  try {
+    const farmId = res.locals.farmId;
+    const layout = req.body?.layout;
+
+    const updates = layout
+      .filter(
+        (item) =>
+          item &&
+          typeof item.coconut_id !== "undefined" &&
+          (typeof item.x === "number" || !isNaN(Number(item.x))) &&
+          (typeof item.z === "number" || !isNaN(Number(item.z)))
+      )
+      .map((item) => ({
+        coconut_id: Number(item.coconut_id),
+        x: Number(item.x),
+        z: Number(item.z),
+      }));
+
+    if (updates.length === 0) {
+      return res.status(200).json({ message: "No valid updates", updated: [] });
+    }
+
+    const ids = [...new Set(updates.map((u) => u.coconut_id))];
+
+    const { data: trees, error: fetchError } = await supabase
+      .from("tree")
+      .select("id, farm_id, coord, tree_code")
+      .in("id", ids);
+
+    if (fetchError) {
+      return next(new HttpError(fetchError.message, 400));
+    }
+
+    if (!trees || trees.length !== ids.length) {
+      const found = new Set((trees || []).map((t) => t.id));
+      const missing = ids.filter((id) => !found.has(id));
+      return next(
+        new HttpError(`Coconuts not found: ${missing.join(", ")}`, 404)
+      );
+    }
+
+    const forbidden = trees
+      .filter((t) => t.farm_id !== farmId)
+      .map((t) => t.id);
+    if (forbidden.length) {
+      return next(
+        new HttpError(`Forbidden coconut ids: ${forbidden.join(", ")}`, 403)
+      );
+    }
+
+    const dedupedMap = new Map();
+    for (const u of updates) {
+      dedupedMap.set(u.coconut_id, { x: u.x, z: u.z });
+    }
+
+    const treeMetaById = new Map(trees.map((t) => [t.id, t]));
+    const upsertRows = Array.from(dedupedMap.entries()).map(([id, coord]) => {
+      const meta = treeMetaById.get(Number(id));
+      return {
+        id: Number(id),
+        farm_id: meta?.farm_id,
+        tree_code: meta?.tree_code,
+        coord: { x: Number(coord.x), z: Number(coord.z) },
+      };
+    });
+
+    const { data: upserted, error: upsertError } = await supabase
+      .from("tree")
+      .upsert(upsertRows, { onConflict: "id", ignoreDuplicates: false })
+      .select("id, coord");
+
+    if (upsertError) {
+      return next(new HttpError(upsertError.message, 400));
+    }
+
+    const results = (upserted || upsertRows).map((r) => ({
+      id: r.id,
+      coord: r.coord,
+    }));
+
+    return res.status(200).json({
+      message: "Coconut layout updated",
+      updated: results,
+    });
+  } catch (error) {
+    console.error("Update coconut layout error:", error);
+    return next(new HttpError("Internal server error", 500));
+  }
+};
