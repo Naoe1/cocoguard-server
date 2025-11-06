@@ -180,6 +180,7 @@ export const login = async (req, res, next) => {
         email: data.user.email,
         role: userData.role,
         farmId: userData.farm_id,
+        city: userData.farm_id.city,
       },
       access_token: data.session.access_token,
       expires_in: data.expires_in,
@@ -204,7 +205,7 @@ export const refreshToken = async (req, res, next) => {
 
     const { data: userData, error: userError } = await supabase
       .from("user")
-      .select("first_name, last_name, farm_id, role")
+      .select("first_name, last_name, farm_id(city,id), role")
       .eq("id", data.user.id)
       .single();
 
@@ -216,7 +217,8 @@ export const refreshToken = async (req, res, next) => {
         lastName: userData.last_name,
         email: data.user.email,
         role: userData.role,
-        farmId: userData.farm_id,
+        farmId: userData.farm_id.id,
+        city: userData.farm_id.city,
       },
       expires_in: data.session?.expires_in,
     });
@@ -255,8 +257,6 @@ export const getCurrentUser = async (req, res, next) => {
       .eq("id", sub)
       .single();
 
-    console.log("Current user data:", data);
-
     if (error) {
       console.log(error);
       return next(new HttpError("Unauthorized", 401));
@@ -291,8 +291,6 @@ export const getCurrentUser = async (req, res, next) => {
 export const forgotPassword = async (req, res, next) => {
   try {
     const { email } = req.body;
-
-    console.log("forgot password for email: " + email);
 
     const { data: userData, error: userErr } = await supabase
       .from("user")
@@ -460,7 +458,6 @@ export const confirmEmail = async (req, res, next) => {
     });
 
     if (userErr) {
-      console.log("Error verifying OTP:", userErr);
       return next(new HttpError("Invalid token", 400));
     }
 
